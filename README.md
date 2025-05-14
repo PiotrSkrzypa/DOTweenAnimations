@@ -5,7 +5,7 @@
 
 !!!IMPORTANT!!!
 Note this asset uses DOTween, and it will not work without having DOTween installed.
-
+Also in DOTween Utility Panel you must Create ASMDEF
 
 ## How to Install
 
