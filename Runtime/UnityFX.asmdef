@@ -7,7 +7,9 @@
         "UnityEngine.UI",
         "DOTween.Modules",
         "UniTask",
-        "Alchemy"
+        "Alchemy",
+        "LitMotion",
+        "LitMotion.Extensions"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

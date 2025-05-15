@@ -1,8 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using LitMotion;
+using LitMotion.Extensions;
 using UnityEngine;
-using Sequence = DG.Tweening.Sequence;
 
 namespace PSkrzypa.UnityFX
 {
@@ -11,30 +13,27 @@ namespace PSkrzypa.UnityFX
     {
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning { get; private set; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-        bool isRunning;
         [SerializeField] CanvasGroup targetCanvasGroup;
         [SerializeField] float duration;
         [SerializeField] float delay;
         [SerializeField] bool timeScaleIndependent = true;
         [SerializeField] float startAlpha;
         [SerializeField] float targetAlpha;
-        Sequence sequence;
-
-
-        #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        CancellationTokenSource cancellationTokenSource;
+
+        #region Callbacks
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -56,54 +55,40 @@ namespace PSkrzypa.UnityFX
 
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
-            if (targetCanvasGroup.alpha != startAlpha)
-            {
-                animationDelay = 0f;
-            }
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            sequence.AppendInterval(animationDelay);
-            if (afterDelayCallback != null)
-            {
-                sequence.AppendCallback(() => afterDelayCallback());
-            }
-            sequence.Append(targetCanvasGroup.DOFade(targetAlpha, duration).OnComplete(() =>
-            {
-                isRunning = false;
-                InformAboutAnimationEnd(callbackAfterAnimation);
-            }));
-            sequence.SetLink(targetCanvasGroup.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
+            _ = PlayAsync();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
+        private async UniTask PlayAsync()
         {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
+            IsRunning = true;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+
+            float animationDelay = (Mathf.Approximately(targetCanvasGroup.alpha, startAlpha)) ? delay : 0f;
+
+            if (animationDelay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(animationDelay), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            afterDelayCallback?.Invoke();
+
+            var handle = LMotion.Create(targetCanvasGroup.alpha, targetAlpha, duration)
+                .WithEase(LitMotion.Ease.OutQuad).WithScheduler(timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .BindToAlpha(targetCanvasGroup);
+            await handle.ToUniTask(cancellationTokenSource.Token);
+
+            IsRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
         public void Stop()
         {
-            if (isRunning)
+            if (IsRunning)
             {
-                isRunning = false;
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
                 targetCanvasGroup.alpha = startAlpha;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
             }
         }
     }
