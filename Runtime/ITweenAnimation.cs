@@ -13,13 +13,11 @@ namespace PSkrzypa.DOTweenAnimations
         TweenAnimationCallback BeforeAnimationCallback { get; }
         TweenAnimationCallback AfterDelayCallback { get; }
         TweenAnimationCallback AfterAnimationCallback { get; }
-        List<ITweenAnimation> AdditionalAnimations { get; set; }
-        List<ITweenAnimation> FollowingAnimations { get; set; }
         ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback);
         ITweenAnimation WithAfterDelayCallback(TweenAnimationCallback afterDelayCallback);
         ITweenAnimation WithAfterAnimationCallback(TweenAnimationCallback afterAnimationCallback);
         void Play();
-        void StopAllTweens();
+        void Stop();
     }
     public delegate void TweenAnimationCallback();
 }

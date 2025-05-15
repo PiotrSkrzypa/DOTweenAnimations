@@ -13,8 +13,6 @@ namespace PSkrzypa.DOTweenAnimations
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public List<ITweenAnimation> FollowingAnimations { get => followingAnimations; set => followingAnimations = value; }
-        public List<ITweenAnimation> AdditionalAnimations { get => additionalAnimations; set => additionalAnimations = value; }
 
 
         bool isRunning;
@@ -30,8 +28,6 @@ namespace PSkrzypa.DOTweenAnimations
         [SerializeField] AnimationCurve zPositionCurve;
         [SerializeField] PathType pathType;
         [SerializeField] Ease easeType = Ease.Linear;
-        [SerializeField][SerializeReference] List<ITweenAnimation> additionalAnimations;
-        [SerializeField][SerializeReference] List<ITweenAnimation> followingAnimations;
         Vector3[] waypoints;
         List<Sequence> sequences;
 
@@ -62,7 +58,7 @@ namespace PSkrzypa.DOTweenAnimations
         {
             callbackAfterAnimation = afterAnimationCallback;
             return this;
-        } 
+        }
         #endregion
 
 
@@ -83,13 +79,6 @@ namespace PSkrzypa.DOTweenAnimations
                 for (int i = 0; i < sequences.Count; i++)
                 {
                     sequences[i].Kill();
-                }
-            }
-            if (additionalAnimations != null)
-            {
-                for (int i = 0; i < additionalAnimations.Count; i++)
-                {
-                    additionalAnimations[i].Play();
                 }
             }
             for (int i = 0; i < transformsToMove.Count; i++)
@@ -115,7 +104,6 @@ namespace PSkrzypa.DOTweenAnimations
                     {
                         isRunning = false;
                         InformAboutAnimationEnd(callbackAfterAnimation);
-                        PlayFollowingAnimations();
                     }
                 });
                 sequence.SetLink(transformToPosition.gameObject, LinkBehaviour.KillOnDestroy);
@@ -124,16 +112,6 @@ namespace PSkrzypa.DOTweenAnimations
             }
         }
 
-        private void PlayFollowingAnimations()
-        {
-            if (followingAnimations != null)
-            {
-                for (int j = 0; j < followingAnimations.Count; j++)
-                {
-                    followingAnimations[j].Play();
-                }
-            }
-        }
 
         private static void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
         {
@@ -165,7 +143,7 @@ namespace PSkrzypa.DOTweenAnimations
             }
         }
 
-        public void StopAllTweens()
+        public void Stop()
         {
             if (isRunning)
             {
@@ -180,20 +158,6 @@ namespace PSkrzypa.DOTweenAnimations
                     {
                         sequences[i].Kill();
                     }
-                }
-            }
-            if (additionalAnimations != null)
-            {
-                for (int i = 0; i < additionalAnimations.Count; i++)
-                {
-                    additionalAnimations[i].StopAllTweens();
-                }
-            }
-            if (followingAnimations != null)
-            {
-                for (int i = 0; i < followingAnimations.Count; i++)
-                {
-                    followingAnimations[i].StopAllTweens();
                 }
             }
         }

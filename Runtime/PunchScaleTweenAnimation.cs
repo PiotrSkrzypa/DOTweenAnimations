@@ -13,10 +13,8 @@ namespace PSkrzypa.DOTweenAnimations
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public List<ITweenAnimation> FollowingAnimations { get => followingAnimations; set => followingAnimations = value; }
-        public List<ITweenAnimation> AdditionalAnimations { get => additionalAnimations; set => additionalAnimations = value; }
         public float Elasticity { get => elasticity; set => elasticity = value; }
-        public int Vibrato { get => vibrato; set => vibrato =  value ; }
+        public int Vibrato { get => vibrato; set => vibrato = value; }
 
         bool isRunning;
         [SerializeField] List<Transform> transformsToScale;
@@ -27,8 +25,6 @@ namespace PSkrzypa.DOTweenAnimations
         [SerializeField] bool timeScaleIndependent = true;
         [SerializeField] Vector3 startingScale;
         [SerializeField] Vector3 punchStrength;
-        [SerializeField][SerializeReference] List<ITweenAnimation> additionalAnimations;
-        [SerializeField][SerializeReference] List<ITweenAnimation> followingAnimations;
         List<Sequence> sequences;
 
         #region Callbacks
@@ -78,13 +74,6 @@ namespace PSkrzypa.DOTweenAnimations
                     sequences[i].Kill();
                 }
             }
-            if (additionalAnimations != null)
-            {
-                for (int i = 0; i < additionalAnimations.Count; i++)
-                {
-                    additionalAnimations[i].Play();
-                }
-            }
             for (int i = 0; i < transformsToScale.Count; i++)
             {
                 transformsToScale[i].localScale = startingScale;
@@ -111,13 +100,6 @@ namespace PSkrzypa.DOTweenAnimations
                         {
                             callbackAfterAnimation();
                         }
-                        if (followingAnimations != null)
-                        {
-                            for (int j = 0; j < followingAnimations.Count; j++)
-                            {
-                                followingAnimations[j].Play();
-                            }
-                        }
                     }
                 });
                 sequence.SetLink(transformToScale.gameObject, LinkBehaviour.KillOnDestroy);
@@ -126,7 +108,7 @@ namespace PSkrzypa.DOTweenAnimations
             }
         }
 
-        public void StopAllTweens()
+        public void Stop()
         {
             if (isRunning)
             {
@@ -141,20 +123,6 @@ namespace PSkrzypa.DOTweenAnimations
                     {
                         sequences[i].Kill();
                     }
-                } 
-            }
-            if (additionalAnimations != null)
-            {
-                for (int i = 0; i < additionalAnimations.Count; i++)
-                {
-                    additionalAnimations[i].StopAllTweens();
-                }
-            }
-            if (followingAnimations != null)
-            {
-                for (int i = 0; i < followingAnimations.Count; i++)
-                {
-                    followingAnimations[i].StopAllTweens();
                 }
             }
         }
