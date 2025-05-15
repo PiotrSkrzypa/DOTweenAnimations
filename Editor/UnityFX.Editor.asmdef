@@ -1,13 +1,9 @@
 {
-    "name": "UnityFX",
-    "rootNamespace": "PSkrzypa.UnityFX",
+    "name": "UnityFX.Editor",
+    "rootNamespace": "",
     "references": [
-        "Unity.TextMeshPro",
-        "Unity.RenderPipelines.Core.Runtime",
-        "UnityEngine.UI",
-        "DOTween.Modules",
-        "UniTask",
-        "Alchemy"
+        "Alchemy.Editor",
+        "UnityFX"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
