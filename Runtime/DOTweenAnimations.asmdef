@@ -1,11 +1,12 @@
 {
-    "name": "DOTweenAnimations",
-    "rootNamespace": "PSkrzypa.DOTweenAnimations",
+    "name": "UnityFX",
+    "rootNamespace": "PSkrzypa.UnityFX",
     "references": [
         "Unity.TextMeshPro",
         "Unity.RenderPipelines.Core.Runtime",
         "UnityEngine.UI",
-        "DOTween.Modules"
+        "DOTween.Modules",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

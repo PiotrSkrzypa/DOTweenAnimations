@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 
-namespace PSkrzypa.DOTweenAnimations
+namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class LightTweenAnimation : ITweenAnimation

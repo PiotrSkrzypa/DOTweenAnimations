@@ -6,7 +6,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace PSkrzypa.DOTweenAnimations
+namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class ColorTextMeshProTweenAnimation : ITweenAnimation

@@ -4,7 +4,7 @@ using DG.Tweening;
 using UnityEngine;
 using Sequence = DG.Tweening.Sequence;
 
-namespace PSkrzypa.DOTweenAnimations
+namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class CanvasGroupAlphaTweenAnimation : ITweenAnimation

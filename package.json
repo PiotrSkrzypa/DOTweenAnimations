@@ -1,11 +1,12 @@
 {
-  "name": "com.pskrzypa.dotweenanimations",
+  "name": "com.pskrzypa.unityfx",
   "version": "1.0.0",
-  "displayName": "DOTweenAnimations",
-  "description": "Set of animation scripts using DOTween",
+  "displayName": "Unity FX",
+  "description": "Tools for adding special effects or feedbacks for your game. Transforms animation, screenshakes, playing sounds and more.",
   "unity": "2022.1",
   "dependencies": {
-    "com.unity.render-pipelines.universal": "17.0.3"
+    "com.unity.render-pipelines.universal": "17.0.3",
+	"com.cysharp.unitask": "2.5.10"
  },
   "author": {
     "name": "Piotr Skrzypa",

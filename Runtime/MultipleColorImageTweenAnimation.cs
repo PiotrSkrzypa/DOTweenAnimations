@@ -5,7 +5,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace PSkrzypa.DOTweenAnimations
+namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class MultipleColorImageTweenAnimation : ITweenAnimation

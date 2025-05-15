@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace PSkrzypa.DOTweenAnimations
+namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class EmptyTweenAnimation : ITweenAnimation
