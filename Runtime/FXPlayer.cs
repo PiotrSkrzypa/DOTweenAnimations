@@ -81,7 +81,20 @@ namespace PSkrzypa.UnityFX
             componentToPlay.Initialize();
             componentToPlay.Play();
         }
+        [Button]
         public void Stop()
+        {
+            if (components == null)
+            {
+                return;
+            }
+            for (int i = 0; i < components.Length; i++)
+            {
+                components[i].Stop();
+            }
+        }
+        [Button]
+        public void ResetComponents()
         {
             if (components == null)
             {

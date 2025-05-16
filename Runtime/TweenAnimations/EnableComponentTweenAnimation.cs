@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace PSkrzypa.UnityFX
 {
@@ -12,29 +11,30 @@ namespace PSkrzypa.UnityFX
     {
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
+        public bool IsRunning => isRunning;
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public bool IsRunning { get => isRunning; }
 
         bool isRunning;
+
         [SerializeField] Behaviour componentToEnable;
-        [SerializeField] float duration;
-        [SerializeField] float delay;
+        [SerializeField] float duration = 0.2f;
+        [SerializeField] float delay = 0f;
         [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] bool targetState;
+        [SerializeField] bool targetState = true;
+
         bool originalState;
-        Sequence sequence;
+
+        CancellationTokenSource cancellationTokenSource;
 
         #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
-
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -53,58 +53,71 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
-            originalState = componentToEnable.enabled;
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            sequence.AppendInterval(animationDelay);
-            sequence.AppendCallback(() =>
-            {
-                componentToEnable.enabled = targetState;
-            });
-            if (afterDelayCallback != null)
-            {
-                sequence.AppendCallback(() => afterDelayCallback());
-            }
-            sequence.AppendInterval(duration).OnComplete(() =>
-            {
-                isRunning = false;
-                InformAboutAnimationEnd(callbackAfterAnimation);
-            });
-            sequence.SetLink(componentToEnable.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
+            _ = PlayAsync();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
+        async UniTaskVoid PlayAsync()
         {
-            if (callbackAfterAnimation != null)
+            if (componentToEnable == null)
             {
-                callbackAfterAnimation();
+                Debug.LogWarning("[EnableComponentTweenAnimation] componentToEnable is null.");
+                return;
             }
-        }
 
+            isRunning = true;
+
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+
+            originalState = componentToEnable.enabled;
+
+            if (Delay > 0f)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(Delay),
+                    ignoreTimeScale: timeScaleIndependent, 
+                    cancellationToken: cancellationTokenSource.Token);
+            }
+
+            componentToEnable.enabled = targetState;
+            afterDelayCallback?.Invoke();
+
+            if (Duration > 0f)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(Duration),
+                    ignoreTimeScale: timeScaleIndependent, 
+                    cancellationToken: cancellationTokenSource.Token);
+            }
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+        [Button]
         public void Stop()
         {
-            if (isRunning)
+            if (!isRunning) return;
+            isRunning = false;
+
+            if (componentToEnable != null)
             {
-                isRunning = false;
                 componentToEnable.enabled = originalState;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
             }
+            cancellationTokenSource?.Cancel();
+        }
+        [Button]
+        public void Reset()
+        {
+            isRunning = false;
+
+            if (componentToEnable != null)
+            {
+                componentToEnable.enabled = originalState;
+            }
+            cancellationTokenSource?.Cancel();
         }
     }
 }

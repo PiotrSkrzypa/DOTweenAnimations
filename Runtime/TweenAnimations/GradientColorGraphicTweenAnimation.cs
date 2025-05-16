@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,30 +13,31 @@ namespace PSkrzypa.UnityFX
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning => isRunning;
 
         bool isRunning;
+
         [SerializeField] Graphic graphicToColor;
-        [SerializeField] float duration;
-        [SerializeField] float delay;
+        [SerializeField] float duration = 1f;
+        [SerializeField] float delay = 0f;
         [SerializeField] bool timeScaleIndependent = true;
         [SerializeField] float gradientSamplingResolution = 30f;
         [SerializeField] Gradient gradient;
+
         Color[] colorSamples;
         Color originalColor;
-        Sequence sequence;
+
+        CancellationTokenSource cancellationTokenSource;
 
         #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
-
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -55,68 +56,81 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+
+        [Button]
         public void Play()
         {
+            _ = PlayAsync();
+        }
+
+        private async UniTask PlayAsync()
+        {
+            if (graphicToColor == null)
+            {
+                Debug.LogWarning("[GradientColorGraphicTweenAnimation] graphicToColor is null.");
+                return;
+            }
+
             isRunning = true;
-            colorSamples = new Color[(int)gradientSamplingResolution];
-            for (int i = 0; i < gradientSamplingResolution; i++)
-            {
-                Color colorSample = gradient.Evaluate(i/(gradientSamplingResolution-1));
-                colorSamples[i] = colorSample;
-            }
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
+
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
             originalColor = graphicToColor.color;
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            sequence.AppendInterval(animationDelay);
-            if (afterDelayCallback != null)
+
+            if (delay > 0f)
             {
-                sequence.AppendCallback(() => afterDelayCallback());
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), 
+                    ignoreTimeScale: timeScaleIndependent,
+                    cancellationToken: cancellationTokenSource.Token);
             }
+
+            afterDelayCallback?.Invoke();
+
+            int steps = Mathf.Max(1, Mathf.RoundToInt(gradientSamplingResolution));
+            float stepDuration = duration / steps;
+            colorSamples = new Color[steps];
+
+            for (int i = 0; i < steps; i++)
+            {
+                float t = i / (steps - 1f);
+                colorSamples[i] = gradient.Evaluate(t);
+            }
+
             for (int i = 0; i < colorSamples.Length; i++)
             {
-                Tween tween = graphicToColor.DOColor(colorSamples[i], duration / colorSamples.Length);
-                if (i == colorSamples.Length - 1)
-                {
-                    tween.OnComplete(() =>
-                    {
-                        isRunning = false;
-                        InformAboutAnimationEnd(callbackAfterAnimation);
-                    });
-                }
-                sequence.Append(tween);
+                graphicToColor.color = colorSamples[i];
+                await UniTask.Delay(TimeSpan.FromSeconds(stepDuration), 
+                    ignoreTimeScale: timeScaleIndependent,
+                    cancellationToken: cancellationTokenSource.Token);
             }
-            sequence.SetLink(graphicToColor.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
-        {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
-        }
-
+        [Button]
         public void Stop()
         {
-            if (isRunning)
+            if (!isRunning) return;
+
+            isRunning = false;
+
+            if (graphicToColor != null)
             {
-                isRunning = false;
                 graphicToColor.color = originalColor;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
             }
+            cancellationTokenSource?.Cancel();
+        }
+        [Button]
+        public void Reset()
+        {
+            if (graphicToColor != null)
+            {
+                graphicToColor.color = originalColor;
+            }
+            cancellationTokenSource?.Cancel();
         }
     }
 }

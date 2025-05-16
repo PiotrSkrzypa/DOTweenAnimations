@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Alchemy.Inspector;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using LitMotion;
@@ -52,7 +53,7 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
-
+        [Button]
         public void Play()
         {
             _ = PlayAsync();
@@ -81,7 +82,7 @@ namespace PSkrzypa.UnityFX
             IsRunning = false;
             callbackAfterAnimation?.Invoke();
         }
-
+        [Button]
         public void Stop()
         {
             if (IsRunning)
@@ -90,6 +91,16 @@ namespace PSkrzypa.UnityFX
                 cancellationTokenSource?.Cancel();
                 targetCanvasGroup.alpha = startAlpha;
             }
+        }
+        [Button]
+        public void Reset()
+        {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
+            targetCanvasGroup.alpha = startAlpha;
         }
     }
 }

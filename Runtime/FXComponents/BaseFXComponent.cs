@@ -39,15 +39,19 @@ namespace PSkrzypa.UnityFX
                 CancellationTokenCleanUp();
             }
         }
+        public virtual void Stop()
+        {
+            CancellationTokenCleanUp();
+        }
+        public virtual void Reset()
+        {
+            CancellationTokenCleanUp();
+        }
 
         protected virtual void PlayInternal()
         {
         }
 
-        public virtual void Stop()
-        {
-            CancellationTokenCleanUp();
-        }
         private void CancellationTokenCleanUp()
         {
             cts?.Cancel();

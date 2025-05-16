@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
+using LitMotion;
+using LitMotion.Extensions;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace PSkrzypa.UnityFX
 {
@@ -13,29 +14,27 @@ namespace PSkrzypa.UnityFX
     {
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning { get; private set; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-        bool isRunning;
         [SerializeField] TMP_Text textToColor;
         [SerializeField] float duration;
         [SerializeField] float delay;
         [SerializeField] bool timeScaleIndependent = true;
         [SerializeField] Color startColor;
         [SerializeField] Color targetColor;
-        Sequence sequence;
-
-        #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        CancellationTokenSource cancellationTokenSource;
+
+        #region Callbacks
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -54,58 +53,60 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
-            if (textToColor.color != startColor)
-            {
-                animationDelay = 0f;
-            }
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            sequence.AppendInterval(animationDelay);
-            if (afterDelayCallback != null)
-            {
-                sequence.AppendCallback(() => afterDelayCallback());
-            }
-            sequence.Append(textToColor.DOColor(targetColor, duration).OnComplete(() =>
-            {
-                isRunning = false;
-                InformAboutAnimationEnd(callbackAfterAnimation);
-            }));
-            sequence.SetLink(textToColor.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
+            _ = PlayAsync();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
+        private async UniTask PlayAsync()
         {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
+            IsRunning = true;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+
+            float animationDelay = (textToColor.color == startColor) ? delay : 0f;
+
+            if (animationDelay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(animationDelay), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            afterDelayCallback?.Invoke();
+
+            var handle = LMotion.Create(startColor, targetColor, duration)
+                .WithEase(Ease.OutQuad)
+                .WithScheduler(timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .BindToColor(textToColor);
+
+            await handle.ToUniTask(cancellationTokenSource.Token);
+
+            IsRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
-
+        [Button]
         public void Stop()
         {
-            if (isRunning)
+            if (IsRunning)
             {
-                isRunning = false;
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
                 textToColor.color = startColor;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
             }
+        }
+
+        [Button]
+        public void Reset()
+        {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
+
+            textToColor.color = startColor;
         }
     }
 }

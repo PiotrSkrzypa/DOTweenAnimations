@@ -1,6 +1,8 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
+using LitMotion;
+using System.Threading;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -10,13 +12,14 @@ namespace PSkrzypa.UnityFX
     {
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
-        public bool TimeScaleIndependent => true;
-        public bool IsRunning { get => isRunning; }
+        public bool TimeScaleIndependent => timeScaleIndependent;
+        public bool IsRunning { get; private set; }
 
-        bool isRunning;
-        float duration = 0;
-        float delay = 0;
+        [SerializeField] float duration;
+        [SerializeField] float delay;
+        [SerializeField] bool timeScaleIndependent = true;
 
+        CancellationTokenSource cancellationTokenSource;
 
         #region Callbacks
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
@@ -48,27 +51,50 @@ namespace PSkrzypa.UnityFX
         }
         #endregion
 
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            isRunning = false;
-            InformAboutAnimationEnd(callbackAfterAnimation);
+            _ = PlayAsync();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
+        private async UniTask PlayAsync()
         {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
+            IsRunning = true;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+
+            if (delay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            afterDelayCallback?.Invoke();
+
+            if (duration > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(duration), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            IsRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
+        [Button]
         public void Stop()
         {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
+        }
+
+        [Button]
+        public void Reset()
+        {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
         }
     }
 }

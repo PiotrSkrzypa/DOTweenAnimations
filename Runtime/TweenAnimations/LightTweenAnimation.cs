@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Alchemy.Inspector;
 
 namespace PSkrzypa.UnityFX
 {
@@ -12,28 +12,29 @@ namespace PSkrzypa.UnityFX
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning => isRunning;
 
         bool isRunning;
+        CancellationTokenSource cts;
+
         [SerializeField] Light light;
-        [SerializeField] float duration;
-        [SerializeField] float delay;
+        [SerializeField] float duration = 1f;
+        [SerializeField] float delay = 0f;
         [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] float startIntensity;
-        [SerializeField] float targetIntensity;
-        Sequence sequence;
+        [SerializeField] float startIntensity = 0f;
+        [SerializeField] float targetIntensity = 1f;
+
+        float originalIntensity;
 
         #region Callbacks
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
         public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
         public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -52,56 +53,75 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+
+
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
-            if (light.intensity != startIntensity)
-            {
-                animationDelay = 0f;
-            }
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            sequence.AppendInterval(animationDelay);
-            if (afterDelayCallback != null)
-            {
-                sequence.AppendCallback(() => afterDelayCallback());
-            }
-            sequence.Append(light.DOIntensity(targetIntensity, duration).OnComplete(() =>
-            {
-                isRunning = false;
-                InformAboutAnimationEnd(callbackAfterAnimation);
-            }));
-            sequence.SetLink(light.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
-        }
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
-        {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
+            _ = PlayAsync();
         }
 
+        private async UniTaskVoid PlayAsync()
+        {
+            if (light == null)
+            {
+                Debug.LogWarning("[LightTweenAnimation] Light reference is null.");
+                return;
+            }
+
+            Stop();
+
+            isRunning = true;
+            preparation?.Invoke();
+
+            originalIntensity = light.intensity;
+            light.intensity = startIntensity;
+
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+
+            if (delay > 0f)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
+
+            afterDelayCallback?.Invoke();
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                if (token.IsCancellationRequested) return;
+
+                float t = elapsed / duration;
+                light.intensity = Mathf.Lerp(startIntensity, targetIntensity, t);
+                await UniTask.Yield(PlayerLoopTiming.Update);
+
+                elapsed += timeScaleIndependent ? Time.unscaledDeltaTime : Time.deltaTime;
+            }
+
+            light.intensity = targetIntensity;
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+
+        [Button]
         public void Stop()
         {
-            if (isRunning)
-            {
-                isRunning = false;
+            if (!isRunning) return;
+
+            isRunning = false;
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+
+            if (light != null)
                 light.intensity = startIntensity;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
-            }
+        }
+
+        [Button]
+        public void Reset()
+        {
+            Stop();
+            if (light != null)
+                light.intensity = startIntensity;
         }
     }
 }

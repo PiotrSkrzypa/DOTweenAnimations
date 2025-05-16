@@ -1,43 +1,45 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using DG.Tweening;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using LitMotion;
+using LitMotion.Extensions;
+using System.Threading;
+using Alchemy.Inspector;
 
 namespace PSkrzypa.UnityFX
 {
     [Serializable]
     public class PunchScaleTweenAnimation : ITweenAnimation
     {
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning => isRunning;
         public float Duration { get => duration; set => duration = value; }
+        public int Frequency { get => frequency; set => frequency = value; }
+        public float Damping { get => damping; set => damping = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public float Elasticity { get => elasticity; set => elasticity = value; }
-        public int Vibrato { get => vibrato; set => vibrato = value; }
 
         bool isRunning;
-        [SerializeField] List<Transform> transformsToScale;
-        [SerializeField] float duration;
-        [SerializeField] float elasticity;
-        [SerializeField] int vibrato;
-        [SerializeField] float delay;
-        [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] Vector3 startingScale;
-        [SerializeField] Vector3 punchStrength;
-        List<Sequence> sequences;
+        CancellationTokenSource cts;
+
+        [SerializeField] private Transform transformToScale;
+        [SerializeField] private float duration = 0.5f;
+        [SerializeField] private float damping = 0.5f;
+        [SerializeField] private int frequency = 10;
+        [SerializeField] private float delay = 0f;
+        [SerializeField] private bool timeScaleIndependent = true;
+        [SerializeField] private Vector3 punch;
+        Vector3 originalScale;
 
         #region Callbacks
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
         public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
         public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -56,75 +58,67 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequences == null)
-            {
-                sequences = new List<Sequence>();
-            }
-            else
-            {
-                for (int i = 0; i < sequences.Count; i++)
-                {
-                    sequences[i].Kill();
-                }
-            }
-            for (int i = 0; i < transformsToScale.Count; i++)
-            {
-                transformsToScale[i].localScale = startingScale;
-            }
-
-            for (int i = 0; i < transformsToScale.Count; i++)
-            {
-                Transform transformToScale = transformsToScale[i];
-                int index = i;
-                Sequence sequence = DOTween.Sequence();
-                sequence.SetUpdate(timeScaleIndependent);
-                sequence.AppendInterval(delay);
-                if (afterDelayCallback != null)
-                {
-                    sequence.AppendCallback(() => afterDelayCallback());
-                }
-                sequence.Append(transformToScale.DOPunchScale(punchStrength, duration));
-                sequence.AppendCallback(() =>
-                {
-                    if (index == 0)
-                    {
-                        isRunning = false;
-                        if (callbackAfterAnimation != null)
-                        {
-                            callbackAfterAnimation();
-                        }
-                    }
-                });
-                sequence.SetLink(transformToScale.gameObject, LinkBehaviour.KillOnDestroy);
-                sequence.Play();
-                sequences.Add(sequence);
-            }
+            _ = PlayAsync();
         }
 
+        private async UniTaskVoid PlayAsync()
+        {
+            Stop();
+
+            isRunning = true;
+            preparation?.Invoke();
+
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+            var scheduler = timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+
+            if (delay > 0)
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
+            }
+
+            afterDelayCallback?.Invoke();
+
+            originalScale = transformToScale.localScale;
+
+            UniTask uniTask = LMotion.Punch.Create(originalScale, punch, duration)
+                .WithFrequency(frequency)
+                .WithDampingRatio(damping)
+                .WithScheduler(scheduler)
+                .Bind(transformToScale, (v, tr) => transformToScale.localScale = v)
+                .ToUniTask(token);
+
+
+            await uniTask;
+
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+        [Button]
         public void Stop()
         {
-            if (isRunning)
-            {
-                isRunning = false;
-                for (int i = 0; i < transformsToScale.Count; i++)
-                {
-                    transformsToScale[i].localScale = startingScale;
-                }
-                if (sequences != null)
-                {
-                    for (int i = 0; i < sequences.Count; i++)
-                    {
-                        sequences[i].Kill();
-                    }
-                }
-            }
+            if (!isRunning) return;
+
+            isRunning = false;
+
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+            transformToScale.localScale = originalScale;
+        }
+        [Button]
+        public void Reset()
+        {
+            isRunning = false;
+
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+            transformToScale.localScale = originalScale;
         }
     }
 }

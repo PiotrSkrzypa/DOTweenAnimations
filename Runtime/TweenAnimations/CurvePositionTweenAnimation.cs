@@ -1,7 +1,9 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
+using LitMotion;
+using LitMotion.Extensions;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -9,39 +11,34 @@ namespace PSkrzypa.UnityFX
     [Serializable]
     public class CurvePositionTweenAnimation : ITweenAnimation
     {
-        public bool IsRunning => isRunning;
+        public bool IsRunning { get; private set; }
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-
-        bool isRunning;
-        [SerializeField] List<Transform> transformsToMove;
+        [SerializeField] Transform targetTransform;
         [SerializeField] float duration;
         [SerializeField] float delay;
         [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] bool useUIScale;
+        [SerializeField] bool useLocalSpace = true;
         [SerializeField] Vector3 startingPosition;
         [SerializeField] float samplingResolution = 30f;
         [SerializeField] AnimationCurve xPositionCurve;
         [SerializeField] AnimationCurve yPositionCurve;
         [SerializeField] AnimationCurve zPositionCurve;
-        [SerializeField] PathType pathType;
         [SerializeField] Ease easeType = Ease.Linear;
-        Vector3[] waypoints;
-        List<Sequence> sequences;
-
-        #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        CancellationTokenSource cancellationTokenSource;
+
+        #region Callbacks
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -61,106 +58,92 @@ namespace PSkrzypa.UnityFX
         }
         #endregion
 
-
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            SampleCurves();
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequences == null)
-            {
-                sequences = new List<Sequence>();
-            }
+            _ = PlayAsync();
+        }
+
+        private async UniTask PlayAsync()
+        {
+            IsRunning = true;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+
+            if (useLocalSpace)
+                targetTransform.localPosition = startingPosition;
             else
-            {
-                for (int i = 0; i < sequences.Count; i++)
-                {
-                    sequences[i].Kill();
-                }
-            }
-            for (int i = 0; i < transformsToMove.Count; i++)
-            {
-                transformsToMove[i].localPosition = startingPosition;
-            }
+                targetTransform.position = startingPosition;
 
-            for (int i = 0; i < transformsToMove.Count; i++)
-            {
-                Transform transformToPosition = transformsToMove[i];
-                int index = i;
-                Sequence sequence = DOTween.Sequence();
-                sequence.SetUpdate(timeScaleIndependent);
-                sequence.AppendInterval(delay);
-                if (afterDelayCallback != null)
+            Vector3[] sampledPath = SampleCurves();
+
+            if (delay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            afterDelayCallback?.Invoke();
+
+            await LMotion.Create(0f, 1f, duration)
+                .WithScheduler(timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .WithEase(easeType)
+                .Bind(t =>
                 {
-                    sequence.AppendCallback(() => afterDelayCallback());
-                }
-                sequence.Append(transformToPosition.DOLocalPath(waypoints, duration, pathType).SetEase(easeType));
-                sequence.AppendCallback(() =>
-                {
-                    if (index == 0)
-                    {
-                        isRunning = false;
-                        InformAboutAnimationEnd(callbackAfterAnimation);
-                    }
-                });
-                sequence.SetLink(transformToPosition.gameObject, LinkBehaviour.KillOnDestroy);
-                sequence.Play();
-                sequences.Add(sequence);
-            }
+                    int index = Mathf.Clamp(Mathf.RoundToInt(t * (sampledPath.Length - 1)), 0, sampledPath.Length - 1);
+                    if (useLocalSpace)
+                        targetTransform.localPosition = sampledPath[index];
+                    else
+                        targetTransform.position = sampledPath[index];
+                })
+                .ToUniTask(cancellationTokenSource.Token);
+
+            IsRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
-
-        private static void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
+        private Vector3[] SampleCurves()
         {
-            if (callbackAfterAnimation != null)
+            int steps = Mathf.Max(2, Mathf.RoundToInt(samplingResolution));
+            Vector3[] result = new Vector3[steps];
+            for (int i = 0; i < steps; i++)
             {
-                callbackAfterAnimation();
+                float t = i / (float)(steps - 1);
+                result[i] = new Vector3(
+                    xPositionCurve?.Evaluate(t) ?? 0f,
+                    yPositionCurve?.Evaluate(t) ?? 0f,
+                    zPositionCurve?.Evaluate(t) ?? 0f
+                );
             }
+            return result;
         }
 
-        private void SampleCurves()
-        {
-            waypoints = new Vector3[(int)samplingResolution];
-            for (int i = 0; i < samplingResolution; i++)
-            {
-                Vector3 waypoint = new Vector3();
-                if (xPositionCurve != null && xPositionCurve.keys?.Length > 0)
-                {
-                    waypoint.x = xPositionCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                if (yPositionCurve != null && yPositionCurve.keys?.Length > 0)
-                {
-                    waypoint.y = yPositionCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                if (zPositionCurve != null && zPositionCurve.keys?.Length > 0)
-                {
-                    waypoint.z = zPositionCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                waypoints[i] = waypoint;
-            }
-        }
-
+        [Button]
         public void Stop()
         {
-            if (isRunning)
+            if (IsRunning)
             {
-                isRunning = false;
-                for (int i = 0; i < transformsToMove.Count; i++)
-                {
-                    transformsToMove[i].localPosition = startingPosition;
-                }
-                if (sequences != null)
-                {
-                    for (int i = 0; i < sequences.Count; i++)
-                    {
-                        sequences[i].Kill();
-                    }
-                }
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+                if (useLocalSpace)
+                    targetTransform.localPosition = startingPosition;
+                else
+                    targetTransform.position = startingPosition;
             }
         }
 
+        [Button]
+        public void Reset()
+        {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
+
+            if (useLocalSpace)
+                targetTransform.localPosition = startingPosition;
+            else
+                targetTransform.position = startingPosition;
+        }
     }
 }

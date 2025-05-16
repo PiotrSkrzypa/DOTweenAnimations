@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using LitMotion;
+using System.Threading;
+using Alchemy.Inspector;
 
 namespace PSkrzypa.UnityFX
 {
@@ -11,33 +12,34 @@ namespace PSkrzypa.UnityFX
     {
         public bool IsRunning => isRunning;
         public float Duration { get => duration; set => duration = value; }
-        public float Elasticity { get => elasticity; set => elasticity = value; }
-        public int Vibrato { get => vibrato; set => vibrato = value; }
+        public int Frequency { get => frequency; set => frequency = value; }
+        public float Damping { get => damping; set => damping = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-
         bool isRunning;
-        [SerializeField] List<Transform> transformsToMove;
-        [SerializeField] float duration;
-        [SerializeField] float elasticity;
-        [SerializeField] int vibrato;
-        [SerializeField] float delay;
-        [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] Vector3 punch;
-        List<Sequence> sequences;
+        CancellationTokenSource cts;
+
+        [SerializeField] private Transform transformToMove;
+        [SerializeField] private float duration = 0.5f;
+        [SerializeField] private bool useLocalSpace = true;
+        [SerializeField] private float damping = 0.5f;
+        [SerializeField] private int frequency = 10;
+        [SerializeField] private float delay = 0f;
+        [SerializeField] private bool timeScaleIndependent = true;
+        [SerializeField] private Vector3 punch;
+
+        Vector3 originalPosition;
 
         #region Callbacks
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
         public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
         public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -56,65 +58,85 @@ namespace PSkrzypa.UnityFX
             return this;
         }
         #endregion
+        [Button]
         public void Play()
         {
+            _ = PlayAsync();
+        }
+
+        private async UniTaskVoid PlayAsync()
+        {
+            Stop();
+
             isRunning = true;
-            if (preparation != null)
+            preparation?.Invoke();
+
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+            var scheduler = timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+
+            if (delay > 0)
             {
-                preparation();
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
             }
-            if (sequences == null)
+
+            afterDelayCallback?.Invoke();
+
+            originalPosition = useLocalSpace ?  transformToMove.localPosition : transformToMove.position;
+
+            UniTask uniTask = useLocalSpace ? LMotion.Punch.Create(originalPosition, punch, duration)
+                .WithFrequency(frequency)
+                .WithDampingRatio(damping)
+                .WithScheduler(scheduler)
+                .Bind(transformToMove, (v, tr) => transformToMove.localPosition = v)
+                .ToUniTask(token) :
+                LMotion.Punch.Create(originalPosition, punch, duration)
+                .WithFrequency(frequency)
+                .WithDampingRatio(damping)
+                .WithScheduler(scheduler)
+                .Bind(transformToMove, (v, tr) => transformToMove.position = v)
+                .ToUniTask(token);
+
+
+            await uniTask;
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+        [Button]
+        public void Stop()
+        {
+            if (!isRunning) return;
+
+            isRunning = false;
+
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+            if (useLocalSpace)
             {
-                sequences = new List<Sequence>();
+                transformToMove.localPosition = originalPosition;
             }
             else
             {
-                for (int i = 0; i < sequences.Count; i++)
-                {
-                    sequences[i].Kill();
-                }
-            }
-            for (int i = 0; i < transformsToMove.Count; i++)
-            {
-                Transform transformToPosition = transformsToMove[i];
-                int index = i;
-                Sequence sequence = DOTween.Sequence();
-                sequence.SetUpdate(timeScaleIndependent);
-                sequence.AppendInterval(delay);
-                if (afterDelayCallback != null)
-                {
-                    sequence.AppendCallback(() => afterDelayCallback());
-                }
-                sequence.Append(transformToPosition.DOPunchPosition(punch, duration, vibrato, elasticity));
-                sequence.AppendCallback(() =>
-               {
-                   if (index == 0)
-                   {
-                       isRunning = false;
-                       if (callbackAfterAnimation != null)
-                       {
-                           callbackAfterAnimation();
-                       }
-                   }
-               });
-                sequence.SetLink(transformToPosition.gameObject, LinkBehaviour.KillOnDestroy);
-                sequence.Play();
-                sequences.Add(sequence);
+                transformToMove.position = originalPosition;
             }
         }
-
-        public void Stop()
+        [Button]
+        public void Reset()
         {
-            if (isRunning)
+            isRunning = false;
+
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+            if(useLocalSpace)
             {
-                isRunning = false;
-                if (sequences != null)
-                {
-                    for (int i = 0; i < sequences.Count; i++)
-                    {
-                        sequences[i].Kill();
-                    }
-                }
+                transformToMove.localPosition = originalPosition;
+            }
+            else
+            {
+                transformToMove.position = originalPosition;
             }
         }
     }

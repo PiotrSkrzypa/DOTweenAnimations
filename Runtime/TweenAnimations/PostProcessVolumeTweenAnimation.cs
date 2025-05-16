@@ -1,7 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Rendering;
+using LitMotion;
+using LitMotion.Extensions;
+using Alchemy.Inspector;
 
 namespace PSkrzypa.UnityFX
 {
@@ -11,28 +15,28 @@ namespace PSkrzypa.UnityFX
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
-        public bool IsRunning { get => isRunning; }
+        public bool IsRunning => isRunning;
 
         bool isRunning;
-        [SerializeField] UnityEngine.Rendering.Volume volume;
-        [SerializeField] float duration;
-        [SerializeField] float delay;
-        [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] float startWeight;
-        [SerializeField] float targetWeight;
-        Sequence sequence;
+        CancellationTokenSource cts;
+
+        [SerializeField] private Volume volume;
+        [SerializeField] private float duration;
+        [SerializeField] private float delay;
+        [SerializeField] private bool timeScaleIndependent = true;
+        [SerializeField] private float startWeight;
+        [SerializeField] private float targetWeight;
 
         #region Callbacks
+
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
         public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
         public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -50,58 +54,66 @@ namespace PSkrzypa.UnityFX
             callbackAfterAnimation = afterAnimationCallback;
             return this;
         }
+
         #endregion
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequence != null)
-            {
-                sequence.Kill();
-            }
-            float animationDelay = delay;
-            if (volume.weight != startWeight)
-            {
-                animationDelay = 0f;
-            }
-            sequence = DOTween.Sequence();
-            sequence.SetUpdate(timeScaleIndependent);
-            if (afterDelayCallback != null)
-            {
-                sequence.AppendCallback(() => afterDelayCallback());
-            }
-            sequence.AppendInterval(animationDelay);
-            sequence.Append(DOTween.To(() => volume.weight, x => volume.weight = x, targetWeight, duration));
-            sequence.OnComplete(() =>
-            {
-                isRunning = false;
-                InformAboutAnimationEnd(callbackAfterAnimation);
-            });
-            sequence.SetLink(volume.gameObject, LinkBehaviour.KillOnDestroy);
-            sequence.Play();
-        }
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
-        {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
+            _ = PlayAsync();
         }
 
+        private async UniTaskVoid PlayAsync()
+        {
+            Stop();
+
+            if (volume == null) return;
+
+            isRunning = true;
+            preparation?.Invoke();
+
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+
+            volume.weight = startWeight;
+
+            if (delay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
+
+            afterDelayCallback?.Invoke();
+
+            var scheduler = timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+
+            try
+            {
+                var handle = LMotion.Create(startWeight, targetWeight, duration)
+                    .WithEase(Ease.OutQuad)
+                    .WithScheduler(scheduler)
+                    .Bind(volume, (x, v) => v.weight = x);
+
+                await handle.ToUniTask(token);
+            }
+            catch (OperationCanceledException) { }
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+        [Button]
         public void Stop()
         {
-            if (isRunning)
-            {
-                isRunning = false;
-                volume.weight = startWeight;
-                if (sequence != null)
-                {
-                    sequence.Kill();
-                }
-            }
+            if (!isRunning) return;
+
+            isRunning = false;
+            volume.weight = startWeight;
+
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+        }
+        [Button]
+        public void Reset()
+        {
+            Stop();
+            volume.weight = startWeight;
         }
     }
 }

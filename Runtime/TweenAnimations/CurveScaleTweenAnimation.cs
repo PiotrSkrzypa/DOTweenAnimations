@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Alchemy.Inspector;
+using Cysharp.Threading.Tasks;
+using LitMotion;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -9,37 +10,31 @@ namespace PSkrzypa.UnityFX
     [Serializable]
     public class CurveScaleTweenAnimation : ITweenAnimation
     {
-        public bool IsRunning => isRunning;
+        public bool IsRunning { get; private set; }
         public float Duration { get => duration; set => duration = value; }
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-
-        bool isRunning;
-        [SerializeField] List<Transform> transformsToScale;
+        [SerializeField] Transform targetTransform;
         [SerializeField] float duration;
         [SerializeField] float delay;
         [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] Vector3 startingScale;
-        [SerializeField] float samplingResolution = 30f;
-        [SerializeField] AnimationCurve xScaleCurve;
-        [SerializeField] AnimationCurve yScaleCurve;
-        [SerializeField] AnimationCurve zScaleCurve;
-        [SerializeField] PathType pathType;
-        Vector3[] scaleWaypoints;
-        List<Sequence> sequences;
-
-        #region Callbacks
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
+        [SerializeField] Vector3 startingScale = Vector3.one;
+        [SerializeField] AnimationCurve xCurve;
+        [SerializeField] AnimationCurve yCurve;
+        [SerializeField] AnimationCurve zCurve;
+        [SerializeField] Ease easeType = Ease.Linear;
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
+        CancellationTokenSource cancellationTokenSource;
+
+        public TweenAnimationCallback BeforeAnimationCallback => preparation;
+        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
+        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -57,108 +52,66 @@ namespace PSkrzypa.UnityFX
             callbackAfterAnimation = afterAnimationCallback;
             return this;
         }
-        #endregion
+
+        [Button]
         public void Play()
         {
-            isRunning = true;
-            SampleCurves();
-            if (preparation != null)
-            {
-                preparation();
-            }
-            if (sequences == null)
-            {
-                sequences = new List<Sequence>();
-            }
-            else
-            {
-                for (int i = 0; i < sequences.Count; i++)
-                {
-                    sequences[i].Kill();
-                }
-            }
-            for (int i = 0; i < transformsToScale.Count; i++)
-            {
-                transformsToScale[i].localScale = startingScale;
-            }
-
-            for (int i = 0; i < transformsToScale.Count; i++)
-            {
-                Transform transformToRotate = transformsToScale[i];
-                int index = i;
-                Sequence sequence = DOTween.Sequence();
-                sequence.SetUpdate(timeScaleIndependent);
-                sequence.AppendInterval(delay);
-                if (afterDelayCallback != null && i == 0)
-                {
-                    sequence.AppendCallback(() => afterDelayCallback());
-                }
-                for (int j = 0; j < scaleWaypoints.Length; j++)
-                {
-                    Tween tween = transformToRotate.DOScale(scaleWaypoints[j], duration / scaleWaypoints.Length);
-                    if (j == scaleWaypoints.Length - 1 && index == 0)
-                    {
-                        tween.OnComplete(() =>
-                        {
-                            isRunning = false;
-                            InformAboutAnimationEnd(callbackAfterAnimation);
-                        });
-                    }
-                    sequence.Append(tween);
-                }
-                sequence.SetLink(transformToRotate.gameObject, LinkBehaviour.KillOnDestroy);
-                sequence.Play();
-                sequences.Add(sequence);
-            }
+            _ = PlayAsync();
         }
 
-        private void SampleCurves()
+        private async UniTask PlayAsync()
         {
-            scaleWaypoints = new Vector3[(int)samplingResolution];
-            for (int i = 0; i < samplingResolution; i++)
-            {
-                Vector3 scale = new Vector3();
-                if (xScaleCurve != null && xScaleCurve.keys?.Length > 0)
+            IsRunning = true;
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            preparation?.Invoke();
+            targetTransform.localScale = startingScale;
+
+            if (delay > 0)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: cancellationTokenSource.Token);
+
+            afterDelayCallback?.Invoke();
+
+            await LMotion.Create(0f, 1f, duration)
+                .WithScheduler(timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .WithEase(easeType)
+                .Bind(t =>
                 {
-                    scale.x = xScaleCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                if (yScaleCurve != null && yScaleCurve.keys?.Length > 0)
-                {
-                    scale.y = yScaleCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                if (zScaleCurve != null && zScaleCurve.keys?.Length > 0)
-                {
-                    scale.z = zScaleCurve.Evaluate(i / ( samplingResolution - 1 ));
-                }
-                scaleWaypoints[i] = scale;
-            }
+                    var scale = new Vector3(
+                        xCurve?.Evaluate(t) ?? 1f,
+                        yCurve?.Evaluate(t) ?? 1f,
+                        zCurve?.Evaluate(t) ?? 1f
+                    );
+                    targetTransform.localScale = scale;
+                })
+                .ToUniTask(cancellationTokenSource.Token);
+
+            IsRunning = false;
+            callbackAfterAnimation?.Invoke();
         }
 
-        private void InformAboutAnimationEnd(TweenAnimationCallback callbackAfterAnimation)
-        {
-            if (callbackAfterAnimation != null)
-            {
-                callbackAfterAnimation();
-            }
-        }
-
+        [Button]
         public void Stop()
         {
-            if (isRunning)
+            if (IsRunning)
             {
-                isRunning = false;
-                for (int i = 0; i < transformsToScale.Count; i++)
-                {
-                    transformsToScale[i].localPosition = startingScale;
-                }
-                if (sequences != null)
-                {
-                    for (int i = 0; i < sequences.Count; i++)
-                    {
-                        sequences[i].Kill();
-                    }
-                }
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+                targetTransform.localScale = startingScale;
             }
+        }
+
+        [Button]
+        public void Reset()
+        {
+            if (IsRunning)
+            {
+                IsRunning = false;
+                cancellationTokenSource?.Cancel();
+            }
+
+            targetTransform.localScale = startingScale;
         }
     }
 }

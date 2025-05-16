@@ -18,6 +18,7 @@ namespace PSkrzypa.UnityFX
         ITweenAnimation WithAfterAnimationCallback(TweenAnimationCallback afterAnimationCallback);
         void Play();
         void Stop();
+        void Reset();
     }
     public delegate void TweenAnimationCallback();
 }

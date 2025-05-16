@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using DG.Tweening;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using LitMotion;
+using LitMotion.Extensions;
+using Alchemy.Inspector;
 
 namespace PSkrzypa.UnityFX
 {
@@ -13,27 +17,27 @@ namespace PSkrzypa.UnityFX
         public float Delay { get => delay; set => delay = value; }
         public bool TimeScaleIndependent => timeScaleIndependent;
 
-
         bool isRunning;
-        [SerializeField] List<Transform> transformsToMove;
-        [SerializeField] float duration;
-        [SerializeField] float delay;
-        [SerializeField] bool timeScaleIndependent = true;
-        [SerializeField] Vector3 startingPosition;
-        [SerializeField] Vector3 targetPosition;
-        List<Sequence> sequences;
+        CancellationTokenSource cts;
+
+        [SerializeField] private Transform transformToMove;
+        [SerializeField] private float duration;
+        [SerializeField] private float delay;
+        [SerializeField] bool useLocalSpace = true;
+        [SerializeField] private bool timeScaleIndependent = true;
+        [SerializeField] private Vector3 startingPosition;
+        [SerializeField] private Vector3 targetPosition;
 
         #region Callbacks
+
         public TweenAnimationCallback BeforeAnimationCallback => preparation;
-
         public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-
         public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
 
         TweenAnimationCallback preparation;
         TweenAnimationCallback afterDelayCallback;
         TweenAnimationCallback callbackAfterAnimation;
+
         public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
         {
             preparation = beforeAnimationCallback;
@@ -51,76 +55,86 @@ namespace PSkrzypa.UnityFX
             callbackAfterAnimation = afterAnimationCallback;
             return this;
         }
+
         #endregion
+        [Button]
         public void Play()
         {
+            _ = PlayAsync();
+        }
+
+        private async UniTaskVoid PlayAsync()
+        {
+            Stop();
+
+            if (transformToMove == null)
+                return;
+
             isRunning = true;
-            if (preparation != null)
+            preparation?.Invoke();
+
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+
+            if (delay > 0)
             {
-                preparation();
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
             }
-            if (sequences == null)
+
+            afterDelayCallback?.Invoke();
+
+            ResetPosition();
+
+            var scheduler = timeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+
+
+            var handle = useLocalSpace ? LMotion.Create(startingPosition, targetPosition, duration)
+                    .WithEase(Ease.OutQuad)
+                    .WithScheduler(scheduler)
+                    .Bind(transformToMove, (x, t) => t.localPosition = x) :
+                    LMotion.Create(startingPosition, targetPosition, duration)
+                    .WithEase(Ease.OutQuad)
+                    .WithScheduler(scheduler)
+                    .Bind(transformToMove, (x, t) => t.position = x);
+
+            await handle.ToUniTask(cts.Token);
+
+            isRunning = false;
+            callbackAfterAnimation?.Invoke();
+        }
+        private void ResetPosition()
+        {
+            if (useLocalSpace)
             {
-                sequences = new List<Sequence>();
+                transformToMove.localPosition = startingPosition;
             }
             else
             {
-                for (int i = 0; i < sequences.Count; i++)
-                {
-                    sequences[i].Kill();
-                }
-            }
-            for (int i = 0; i < transformsToMove.Count; i++)
-            {
-                transformsToMove[i].localPosition = startingPosition;
-            }
-
-            for (int i = 0; i < transformsToMove.Count; i++)
-            {
-                Transform transformToPosition = transformsToMove[i];
-                int index = i;
-                Sequence sequence = DOTween.Sequence();
-                sequence.SetUpdate(timeScaleIndependent);
-                sequence.AppendInterval(delay);
-                if (afterDelayCallback != null)
-                {
-                    sequence.AppendCallback(() => afterDelayCallback());
-                }
-                sequence.Append(transformToPosition.DOLocalMove(targetPosition, duration));
-                sequence.AppendCallback(() =>
-               {
-                   if (index == 0)
-                   {
-                       isRunning = false;
-                       if (callbackAfterAnimation != null)
-                       {
-                           callbackAfterAnimation();
-                       }
-                   }
-               });
-                sequence.SetLink(transformToPosition.gameObject, LinkBehaviour.KillOnDestroy);
-                sequence.Play();
-                sequences.Add(sequence);
+                transformToMove.position = startingPosition;
             }
         }
-
+        [Button]
         public void Stop()
         {
-            if (isRunning)
-            {
-                isRunning = false;
-                for (int i = 0; i < transformsToMove.Count; i++)
-                {
-                    transformsToMove[i].localPosition = startingPosition;
-                }
-                if (sequences != null)
-                {
-                    for (int i = 0; i < sequences.Count; i++)
-                    {
-                        sequences[i].Kill();
-                    }
-                }
-            }
+            if (!isRunning) return;
+
+            isRunning = false;
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+
+            ResetPosition();
         }
+        [Button]
+        public void Reset()
+        {
+            isRunning = false;
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+
+            ResetPosition();
+        }
+
     }
 }
