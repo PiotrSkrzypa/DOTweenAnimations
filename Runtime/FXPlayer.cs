@@ -1,5 +1,8 @@
 ﻿using UnityEngine;
 using Alchemy.Inspector;
+using UnityEngine.Events;
+using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace PSkrzypa.UnityFX
 {
@@ -8,10 +11,18 @@ namespace PSkrzypa.UnityFX
         [SerializeField] bool playOnAwake;
         [SerializeField] bool playOnEnable;
         [SerializeField] bool stopOnDisable;
+        [SerializeField] bool timeScaleIndependent = true;
+        [SerializeField] bool forceTimeScaleSettingOnComponents = true;
         [SerializeField][SerializeReference] BaseFXComponent[] components;
         public BaseFXComponent[] Components { get => components; }
 
+        public UnityEvent OnPlay;
+        public UnityEvent OnCompleted;
+        public UnityEvent OnCancelled;
+
         protected bool initialized;
+
+        public bool IsPlaying { get; protected set; }
 
         protected virtual void Awake()
         {
@@ -48,42 +59,33 @@ namespace PSkrzypa.UnityFX
         }
 
         [Button]
-        public void Play()
+        public async void Play()
         {
             if (components != null)
             {
+                IsPlaying = true;
+                OnPlay?.Invoke();
+                List<UniTask> tasks = new List<UniTask>();
                 for (int i = 0; i < components.Length; i++)
                 {
                     components[i].Initialize();
-                    components[i].Play();
+                    UniTask task = components[i].Play();
+                    if(components[i].Timing.ContributeToTotalDuration)
+                    {
+                        tasks.Add(task);
+                    }
                 }
+                await UniTask.WhenAll(tasks);
+                OnCompleted?.Invoke();
             }
-        }
-        public void PlaySingleComponent(int index)
-        {
-            if (components == null)
-            {
-                return;
-            }
-            if (index > components.Length - 1)
-            {
-                return;
-            }
-            components[index].Initialize();
-            components[index].Play();
-        }
-        public void Play(FXPlayer componentToPlay)
-        {
-            if (componentToPlay == null)
-            {
-                return;
-            }
-            componentToPlay.Initialize();
-            componentToPlay.Play();
         }
         [Button]
         public void Stop()
         {
+            if (!IsPlaying)
+            {
+                return;
+            }
             if (components == null)
             {
                 return;
@@ -92,6 +94,8 @@ namespace PSkrzypa.UnityFX
             {
                 components[i].Stop();
             }
+            IsPlaying = false;
+            OnCancelled?.Invoke();
         }
         [Button]
         public void ResetComponents()
@@ -102,7 +106,7 @@ namespace PSkrzypa.UnityFX
             }
             for (int i = 0; i < components.Length; i++)
             {
-                components[i].Stop();
+                components[i].Reset();
             }
         }
     } 

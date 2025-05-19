@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -8,9 +10,9 @@ namespace PSkrzypa.UnityFX
     {
         [SerializeField] FXPlayer fxObject;
 
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
-            //VFXDirector.Instance.PlayVFXOnPosition(_vfxObject, coroutineRunner.transform.position, coroutineRunner.transform.rotation);
+            await UniTask.Yield();
             fxObject.Play();
         }
     }

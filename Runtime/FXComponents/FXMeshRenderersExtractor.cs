@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -14,7 +16,7 @@ namespace PSkrzypa.UnityFX
         [SerializeField] Transform volumeCenter;
         List<Renderer> foundRenderers;
 
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
             foundRenderers = new List<Renderer>();
             Collider[] colliders = Physics.OverlapBox(volumeCenter.position + volumeCenterOffset, volumeSize / 2f, Quaternion.identity, layerMask);
@@ -39,18 +41,10 @@ namespace PSkrzypa.UnityFX
             for (int i = 0; i < fxComponents.Length; i++)
             {
                 BaseFXComponent fXComponent = fxComponents[i];
-                if (fXComponent is FXTweenAnimation)
+                if (fXComponent is MaterialPropertyBlockTweenAnimation)
                 {
-                    FXTweenAnimation tweenAnimation = fXComponent as FXTweenAnimation;
-                    TryInjectingRenderers(tweenAnimation.Animation);
+                    ( (MaterialPropertyBlockTweenAnimation)fXComponent ).InjectRenderersList(foundRenderers);
                 }
-            }
-        }
-        private void TryInjectingRenderers(ITweenAnimation tweenAnimation)
-        {
-            if (tweenAnimation is MaterialPropertyBlockTweenAnimation)
-            {
-                ( (MaterialPropertyBlockTweenAnimation)tweenAnimation ).InjectRenderersList(foundRenderers);
             }
         }
         public List<Renderer> GetFoundRenderers()

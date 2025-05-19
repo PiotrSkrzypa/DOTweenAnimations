@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.VFX;
 
@@ -14,13 +16,11 @@ namespace PSkrzypa.UnityFX
             base.Initialize();
             visualEffect.Stop();
         }
-
-        public override void Stop()
+        protected override void StopInternal()
         {
-            base.Stop();
             visualEffect.Stop();
         }
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
             visualEffect.Reinit();
             visualEffect.Play();

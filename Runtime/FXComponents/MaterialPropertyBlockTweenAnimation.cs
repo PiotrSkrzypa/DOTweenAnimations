@@ -3,80 +3,19 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using Alchemy.Inspector;
 using LitMotion;
 
 namespace PSkrzypa.UnityFX
 {
     [Serializable]
-    public class MaterialPropertyBlockTweenAnimation : ITweenAnimation
+    public class MaterialPropertyBlockTweenAnimation : BaseFXComponent
     {
-        public bool IsRunning => isRunning;
-        public float Duration { get => duration; set => duration = value; }
-        public float Delay { get => delay; set => delay = value; }
-        public bool TimeScaleIndependent => timeScaleIndependent;
-
-        bool isRunning;
-        CancellationTokenSource cts;
-
         [SerializeField] private List<Renderer> meshRenderers;
-        [SerializeField] private float duration = 1f;
-        [SerializeField] private float delay = 0f;
-        [SerializeField] private bool timeScaleIndependent = true;
         [SerializeField][SerializeReference] private List<MaterialPropertyBlockParameter> parametersToAnimate;
 
-        #region Callbacks
-
-        public TweenAnimationCallback BeforeAnimationCallback => preparation;
-        public TweenAnimationCallback AfterDelayCallback => afterDelayCallback;
-        public TweenAnimationCallback AfterAnimationCallback => callbackAfterAnimation;
-
-        TweenAnimationCallback preparation;
-        TweenAnimationCallback afterDelayCallback;
-        TweenAnimationCallback callbackAfterAnimation;
-
-        public ITweenAnimation WithBeforeAnimationCallback(TweenAnimationCallback beforeAnimationCallback)
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
-            preparation = beforeAnimationCallback;
-            return this;
-        }
-
-        public ITweenAnimation WithAfterDelayCallback(TweenAnimationCallback afterDelayCallback)
-        {
-            this.afterDelayCallback = afterDelayCallback;
-            return this;
-        }
-
-        public ITweenAnimation WithAfterAnimationCallback(TweenAnimationCallback afterAnimationCallback)
-        {
-            callbackAfterAnimation = afterAnimationCallback;
-            return this;
-        }
-
-        #endregion
-
-        [Button]
-        public void Play()
-        {
-            _ = PlayAsync();
-        }
-
-        private async UniTaskVoid PlayAsync()
-        {
-            Stop();
-
             if (meshRenderers == null || parametersToAnimate == null) return;
-
-            isRunning = true;
-            preparation?.Invoke();
-
-            cts = new CancellationTokenSource();
-            var token = cts.Token;
-
-            if (delay > 0)
-                await UniTask.Delay(TimeSpan.FromSeconds(delay), ignoreTimeScale: timeScaleIndependent, cancellationToken: token);
-
-            afterDelayCallback?.Invoke();
 
             List<UniTask> allTasks = new();
 
@@ -90,32 +29,22 @@ namespace PSkrzypa.UnityFX
                 foreach (var param in parametersToAnimate)
                 {
                     param.SetDefaultValue(rendererTmp, block);
-                    sequence.Join(param.CreateMotion(block, duration, timeScaleIndependent));
+                    sequence.Join(param.CreateMotion(block, Timing.Duration, Timing.TimeScaleIndependent));
                 }
-                sequence.Append(LMotion.Create(0f, 1f, duration)
-                    .WithScheduler(timeScaleIndependent ? MotionScheduler.PostLateUpdateIgnoreTimeScale : MotionScheduler.PostLateUpdate)
+                sequence.Append(LMotion.Create(0f, 1f, Timing.Duration)
+                    .WithScheduler(Timing.TimeScaleIndependent ? MotionScheduler.PostLateUpdateIgnoreTimeScale : MotionScheduler.PostLateUpdate)
                     .WithEase(Ease.OutQuad)
                     .Bind(block, (x, block) => rendererTmp.SetPropertyBlock(block)));
-                allTasks.Add(sequence.Run().ToUniTask(token));
+                allTasks.Add(sequence.Run().ToUniTask(cancellationToken));
             }
             try
             {
                 await UniTask.WhenAll(allTasks);
             }
             catch (OperationCanceledException) { }
-
-            isRunning = false;
-            callbackAfterAnimation?.Invoke();
         }
-        [Button]
-        public void Stop()
+        protected override void StopInternal()
         {
-            if (!isRunning) return;
-
-            isRunning = false;
-            cts?.Cancel();
-            cts?.Dispose();
-            cts = null;
             foreach (var renderer in meshRenderers)
             {
                 MaterialPropertyBlock block = new();
@@ -123,13 +52,8 @@ namespace PSkrzypa.UnityFX
             }
         }
 
-        [Button]
-        public void Reset()
+        protected override void ResetInternal()
         {
-            isRunning = false;
-            cts?.Cancel();
-            cts?.Dispose();
-            cts = null;
             foreach (var renderer in meshRenderers)
             {
                 MaterialPropertyBlock block = new();
@@ -157,7 +81,7 @@ namespace PSkrzypa.UnityFX
         {
             [ColorUsage(true, true)] public Color targetColor;
 
-            public override MotionHandle CreateMotion(MaterialPropertyBlock block, float duration, 
+            public override MotionHandle CreateMotion(MaterialPropertyBlock block, float duration,
                 bool timeScaleIndependent)
             {
                 Color startColor = block.GetColor(parameterName);

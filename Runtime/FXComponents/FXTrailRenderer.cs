@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -8,14 +10,13 @@ namespace PSkrzypa.UnityFX
     {
         [SerializeField] TrailRenderer trailRenderer;
 
-
-        public override void Stop()
+        protected override void StopInternal()
         {
-            base.Stop();
             trailRenderer.emitting = false;
         }
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
+            await UniTask.Yield();
             trailRenderer.emitting = true;
         }
     }

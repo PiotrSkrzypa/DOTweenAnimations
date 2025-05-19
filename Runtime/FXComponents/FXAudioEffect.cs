@@ -1,4 +1,6 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -10,9 +12,9 @@ namespace PSkrzypa.UnityFX
         [SerializeField] string uiAudioClipKey;
         [SerializeField] bool isUISound;
 
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
-            base.PlayInternal();
+            await UniTask.Delay((int)( Timing.Duration * 1000 ), cancellationToken: cancellationToken);
             AudioSource.PlayClipAtPoint(audioClip, Vector3.zero);
         }
     }

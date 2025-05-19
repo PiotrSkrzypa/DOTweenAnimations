@@ -1,4 +1,6 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -12,13 +14,13 @@ namespace PSkrzypa.UnityFX
         {
             particleSystem.Stop();
         }
-        public override void Stop()
+        protected override void StopInternal()
         {
-            base.Stop();
             particleSystem.Stop();
         }
-        override protected void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
+            await UniTask.Yield();
             particleSystem.time = 0;
             particleSystem.Play();
         }

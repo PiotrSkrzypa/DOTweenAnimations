@@ -1,4 +1,6 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
 
 namespace PSkrzypa.UnityFX
@@ -8,13 +10,13 @@ namespace PSkrzypa.UnityFX
     {
         [SerializeField] Light light;
 
-        public override void Stop()
+        protected override void StopInternal()
         {
-            base.Stop();
             light.enabled = false;
         }
-        protected override void PlayInternal()
+        protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
+            await UniTask.Yield();
             light.enabled = true;
         }
     }
