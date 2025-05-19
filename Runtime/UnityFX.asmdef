@@ -5,7 +5,6 @@
         "Unity.TextMeshPro",
         "Unity.RenderPipelines.Core.Runtime",
         "UnityEngine.UI",
-        "DOTween.Modules",
         "UniTask",
         "Alchemy",
         "LitMotion",
