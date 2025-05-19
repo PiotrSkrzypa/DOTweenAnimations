@@ -2,11 +2,6 @@
 
 Tools for adding special effects or feedbacks for your game. Transforms animation, screenshakes, playing sounds and more.
 
-## Notes
-
-!!!IMPORTANT!!!
-Note this asset uses DOTween, and it will not work without having DOTween installed.
-Also in DOTween Utility Panel you must Create ASMDEF
 
 ## How to Install
 
