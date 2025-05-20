@@ -25,7 +25,7 @@ namespace PSkrzypa.UnityFX
 
             volume.weight = startWeight;
 
-            var scheduler = Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+            var scheduler = Timing.GetScheduler();
 
             var tween = LMotion.Create(startWeight, targetWeight, Timing.Duration)
                 .WithEase(ease)

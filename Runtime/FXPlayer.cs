@@ -59,7 +59,7 @@ namespace PSkrzypa.UnityFX
         }
 
         [Button]
-        public async void Play()
+        public async UniTaskVoid Play()
         {
             if (components != null)
             {

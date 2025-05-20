@@ -26,7 +26,7 @@ namespace PSkrzypa.UnityFX
 
             originalScale = transformToScale.localScale;
 
-            var scheduler = Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+            var scheduler = Timing.GetScheduler();
 
             try
             {

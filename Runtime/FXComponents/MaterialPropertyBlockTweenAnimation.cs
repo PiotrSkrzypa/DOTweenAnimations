@@ -32,7 +32,7 @@ namespace PSkrzypa.UnityFX
                     sequence.Join(param.CreateMotion(block, Timing.Duration, Timing.TimeScaleIndependent));
                 }
                 sequence.Append(LMotion.Create(0f, 1f, Timing.Duration)
-                    .WithScheduler(Timing.TimeScaleIndependent ? MotionScheduler.PostLateUpdateIgnoreTimeScale : MotionScheduler.PostLateUpdate)
+                    .WithScheduler(Timing.GetScheduler())
                     .WithEase(Ease.OutQuad)
                     .Bind(block, (x, block) => rendererTmp.SetPropertyBlock(block)));
                 allTasks.Add(sequence.Run().ToUniTask(cancellationToken));

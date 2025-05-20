@@ -28,7 +28,7 @@ namespace PSkrzypa.UnityFX
             Vector3[] sampledPath = SampleCurves();
 
             await LMotion.Create(0f, 1f, Timing.Duration)
-                .WithScheduler(Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .WithScheduler(Timing.GetScheduler())
                 .WithEase(easeType)
                 .Bind(t =>
                 {

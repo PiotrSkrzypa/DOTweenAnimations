@@ -26,7 +26,7 @@ namespace PSkrzypa.UnityFX
                 targetTransform.eulerAngles = startingRotation;
 
             await LMotion.Create(0f, 1f, Timing.Duration)
-                .WithScheduler(Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .WithScheduler(Timing.GetScheduler())
                 .WithEase(easeType)
                 .Bind(t =>
                 {

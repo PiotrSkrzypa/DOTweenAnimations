@@ -21,7 +21,7 @@ namespace PSkrzypa.UnityFX
 
             ResetPosition();
 
-            var scheduler = Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+            var scheduler = Timing.GetScheduler();
 
             var morionBuilder = LMotion.Create(startingPosition, targetPosition, Timing.Duration)
                     .WithEase(Ease.OutQuad)

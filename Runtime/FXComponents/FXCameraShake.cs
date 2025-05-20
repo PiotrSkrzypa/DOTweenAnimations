@@ -25,7 +25,7 @@ namespace PSkrzypa.UnityFX
             Vector3 originalPosiiton = camera.transform.localPosition;
             Vector3 originalRotation = camera.transform.localEulerAngles;
             List<UniTask> tasks = new List<UniTask>();
-            var scheduler = Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+            var scheduler = Timing.GetScheduler();
             if (movementShakeMagnitude != Vector3.zero)
             {
                 UniTask uniTask = LMotion.Shake.Create(originalPosiiton, movementShakeMagnitude, Timing.Duration)

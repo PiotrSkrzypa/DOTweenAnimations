@@ -15,7 +15,7 @@ namespace PSkrzypa.UnityFX
 
         protected override async UniTask PlayInternal(CancellationToken cancellationToken)
         {
-            var scheduler = Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
+            var scheduler = Timing.GetScheduler();
 
             originalScale = transformToScale.localScale;
 

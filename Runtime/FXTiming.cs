@@ -1,4 +1,5 @@
 ﻿using System;
+using LitMotion;
 
 namespace PSkrzypa.UnityFX
 {
@@ -19,5 +20,8 @@ namespace PSkrzypa.UnityFX
         public int PlayCount;
 
         public bool IsRunning { get; set; }
+
+        public IMotionScheduler GetScheduler() =>
+    TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
     }
 }

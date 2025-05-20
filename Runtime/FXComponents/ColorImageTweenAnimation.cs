@@ -19,7 +19,7 @@ namespace PSkrzypa.UnityFX
         {
             var handle = LMotion.Create(startColor, targetColor, Timing.Duration)
                 .WithEase(Ease.OutQuad)
-                .WithScheduler(Timing.TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update)
+                .WithScheduler(Timing.GetScheduler())
                 .BindToColor(imageToColor);
 
             await handle.ToUniTask(cancellationToken);
