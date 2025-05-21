@@ -13,8 +13,8 @@ namespace PSkrzypa.UnityFX
         [SerializeField] bool stopOnDisable;
         [SerializeField] bool timeScaleIndependent = true;
         [SerializeField] bool forceTimeScaleSettingOnComponents = true;
-        [SerializeField][SerializeReference] BaseFXComponent[] components;
-        public BaseFXComponent[] Components { get => components; }
+        [SerializeField][SerializeReference] IFXComponent[] components;
+        public IFXComponent[] Components { get => components; }
 
         public UnityEvent OnPlay;
         public UnityEvent OnCompleted;
@@ -32,7 +32,7 @@ namespace PSkrzypa.UnityFX
             }
             if (playOnAwake)
             {
-                Play();
+                Play().Forget();
             }
         }
         public void Initialize()
@@ -47,7 +47,7 @@ namespace PSkrzypa.UnityFX
             }
             if (playOnEnable)
             {
-                Play();
+                Play().Forget();
             }
         }
         private void OnDisable()

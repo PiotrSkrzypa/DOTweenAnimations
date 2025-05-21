@@ -37,10 +37,10 @@ namespace PSkrzypa.UnityFX
             {
                 return;
             }
-            BaseFXComponent[] fxComponents = fXObject.Components;
+            IFXComponent[] fxComponents = fXObject.Components;
             for (int i = 0; i < fxComponents.Length; i++)
             {
-                BaseFXComponent fXComponent = fxComponents[i];
+                IFXComponent fXComponent = fxComponents[i];
                 if (fXComponent is MaterialPropertyBlockTweenAnimation)
                 {
                     ( (MaterialPropertyBlockTweenAnimation)fXComponent ).InjectRenderersList(foundRenderers);

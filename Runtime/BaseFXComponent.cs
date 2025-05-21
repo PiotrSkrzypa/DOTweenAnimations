@@ -7,12 +7,13 @@ using UnityEngine;
 namespace PSkrzypa.UnityFX
 {
     [Serializable]
-    public abstract class BaseFXComponent
+    public abstract class BaseFXComponent : IFXComponent
     {
-        
+        FXTiming IFXComponent.Timing => Timing;
         public FXTiming Timing;
 
         CancellationTokenSource cts;
+
 
         public virtual void Initialize()
         {
@@ -23,11 +24,21 @@ namespace PSkrzypa.UnityFX
         {
             CancellationTokenCleanUp();
             cts = new CancellationTokenSource();
+            CancellationToken token = cts.Token;
             try
             {
-                await UniTask.Delay((int)( Timing.InitialDelay * 1000 ), cancellationToken: cts.Token);
+                await UniTask.Delay((int)( Timing.InitialDelay * 1000 ), cancellationToken: token);
                 Timing.IsRunning = true;
-                await PlayInternal(cancellationToken: cts.Token);
+                int repeatCount = Timing.RepearForever ? int.MaxValue : Timing.NumberOfRepeats;
+
+                for (int i = 0; i < repeatCount; i++)
+                {
+                    await PlayInternal(token);
+                    Timing.PlayCount++;
+
+                    if (Timing.DelayBetweenRepeats > 0)
+                        await UniTask.Delay((int)( Timing.DelayBetweenRepeats * 1000 ), cancellationToken: token);
+                }
                 Timing.IsRunning = false;
             }
             catch (OperationCanceledException)
@@ -51,7 +62,7 @@ namespace PSkrzypa.UnityFX
         }
         protected virtual void StopInternal()
         {
-            
+
         }
         [Button]
         public void Reset()
