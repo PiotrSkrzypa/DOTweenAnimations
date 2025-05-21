@@ -4,7 +4,7 @@ using LitMotion;
 namespace PSkrzypa.UnityFX
 {
     [Serializable]
-    public  class FXTiming
+    public class FXTiming
     {
         public float InitialDelay;
         public float Duration;
@@ -18,8 +18,6 @@ namespace PSkrzypa.UnityFX
         public float DelayBetweenRepeats;
 
         public int PlayCount;
-
-        public bool IsRunning { get; set; }
 
         public IMotionScheduler GetScheduler() =>
     TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;

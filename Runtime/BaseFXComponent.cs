@@ -10,8 +10,9 @@ namespace PSkrzypa.UnityFX
     public abstract class BaseFXComponent : IFXComponent
     {
         FXTiming IFXComponent.Timing => Timing;
+        [SerializeField] bool CanPlayWhenAlreadyPlaying = true;
         public FXTiming Timing;
-
+        private FXPlaybackStateMachine stateMachine = new FXPlaybackStateMachine();
         CancellationTokenSource cts;
 
 
@@ -22,24 +23,42 @@ namespace PSkrzypa.UnityFX
         [Button]
         public async UniTask Play()
         {
-            CancellationTokenCleanUp();
+            if (stateMachine.CurrentState != FXPlaybackStateID.Idle)
+            {
+                if (!CanPlayWhenAlreadyPlaying)
+                {
+                    Debug.LogWarning($"[FX] Cannot play {this} when already playing.");
+                    return;
+                }
+                Stop();
+            }
             cts = new CancellationTokenSource();
             CancellationToken token = cts.Token;
             try
             {
+                SetState(FXPlaybackStateID.WaitingToStart);
                 await UniTask.Delay((int)( Timing.InitialDelay * 1000 ), cancellationToken: token);
-                Timing.IsRunning = true;
-                int repeatCount = Timing.RepearForever ? int.MaxValue : Timing.NumberOfRepeats;
 
+                int repeatCount = Timing.RepearForever ? int.MaxValue : Timing.NumberOfRepeats;
                 for (int i = 0; i < repeatCount; i++)
                 {
+                    SetState(FXPlaybackStateID.Playing);
                     await PlayInternal(token);
                     Timing.PlayCount++;
 
-                    if (Timing.DelayBetweenRepeats > 0)
+                    if (i < repeatCount - 1)
+                    {
+                        SetState(FXPlaybackStateID.RepeatingDelay);
                         await UniTask.Delay((int)( Timing.DelayBetweenRepeats * 1000 ), cancellationToken: token);
+                    }
                 }
-                Timing.IsRunning = false;
+                SetState(FXPlaybackStateID.Completed);
+                if (Timing.CooldownDuration > 0)
+                {
+                    SetState(FXPlaybackStateID.Cooldown);
+                    await UniTask.Delay((int)( Timing.CooldownDuration * 1000 ), DelayType.DeltaTime, PlayerLoopTiming.Update, token);
+                }
+                SetState(FXPlaybackStateID.Idle);
             }
             catch (OperationCanceledException)
             {
@@ -53,12 +72,13 @@ namespace PSkrzypa.UnityFX
         [Button]
         public void Stop()
         {
-            CancellationTokenCleanUp();
-            if (Timing.IsRunning)
+            if (!SetState(FXPlaybackStateID.Cancelled))
             {
-                Timing.IsRunning = false;
-                StopInternal();
+                return;
             }
+            CancellationTokenCleanUp();
+            StopInternal();
+            SetState(FXPlaybackStateID.Idle);
         }
         protected virtual void StopInternal()
         {
@@ -67,12 +87,13 @@ namespace PSkrzypa.UnityFX
         [Button]
         public void Reset()
         {
-            CancellationTokenCleanUp();
-            if (Timing.IsRunning)
+            if (!SetState(FXPlaybackStateID.Cancelled))
             {
-                Timing.IsRunning = false;
+                return;
             }
+            CancellationTokenCleanUp();
             ResetInternal();
+            SetState(FXPlaybackStateID.Idle);
         }
         protected virtual void ResetInternal()
         {
@@ -88,6 +109,11 @@ namespace PSkrzypa.UnityFX
             cts?.Cancel();
             cts?.Dispose();
             cts = null;
+        }
+
+        private bool SetState(FXPlaybackStateID newState)
+        {
+            return stateMachine.TryTransitionTo(newState);
         }
 
     }
