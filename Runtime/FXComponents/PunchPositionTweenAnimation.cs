@@ -16,6 +16,7 @@ namespace PSkrzypa.UnityFX
         [SerializeField] private bool useLocalSpace = true;
         [SerializeField] private float damping = 0.5f;
         [SerializeField] private int frequency = 10;
+        [SerializeField] private Ease ease = Ease.Linear;
         [SerializeField] private Vector3 punch;
 
         Vector3 originalPosition;
@@ -29,6 +30,7 @@ namespace PSkrzypa.UnityFX
             var motionBuilder = LMotion.Punch.Create(originalPosition, punch, Timing.Duration)
                 .WithFrequency(frequency)
                 .WithDampingRatio(damping)
+                .WithEase(ease)
                 .WithScheduler(scheduler);
             UniTask uniTask = useLocalSpace ? 
                 motionBuilder.Bind(transformToMove, (v, tr) => transformToMove.localPosition = v)

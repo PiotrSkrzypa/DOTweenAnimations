@@ -13,6 +13,15 @@ namespace PSkrzypa.UnityFX.Editor
         {
             VisualElement root = new VisualElement();
             visualTree.CloneTree(root);
+            BindField<FloatField>(root, property, "Duration");
+            BindField<FloatField>(root, property, "InitialDelay");
+            BindField<FloatField>(root, property, "CooldownDuration");
+            BindField<FloatField>(root, property, "DelayBetweenRepeats");
+            BindField<IntegerField>(root, property, "NumberOfRepeats");
+            BindField<Toggle>(root, property, "ContributeToTotalDuration");
+            BindField<Toggle>(root, property, "RepeatForever");
+            BindField<Toggle>(root, property, "TimeScaleIndependent");
+           
             ClampFloat(root, "Duration");
             ClampFloat(root, "InitialDelay");
             ClampFloat(root, "CooldownDuration");
@@ -20,7 +29,14 @@ namespace PSkrzypa.UnityFX.Editor
             ClampInt(root, "NumberOfRepeats");
             return root;
         }
-
+        private T BindField<T>(VisualElement root, SerializedProperty parent, string fieldName)
+    where T : BindableElement
+        {
+            var field = root.Q<T>(fieldName);
+            var relative = parent.FindPropertyRelative(fieldName);
+            field?.BindProperty(relative);
+            return field;
+        }
         private static void ClampFloat(VisualElement root, string elementName)
         {
             FloatField duration = root.Q<FloatField>(elementName);
