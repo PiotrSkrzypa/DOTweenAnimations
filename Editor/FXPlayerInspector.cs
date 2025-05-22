@@ -2,11 +2,11 @@
 using PSkrzypa.UnityFX;
 using UnityEditor;
 
-namespace FX.Editor
+namespace PSkrzypa.UnityFX.Editor
 {
     [CanEditMultipleObjects]
     [CustomEditor(typeof(FXPlayer),true)]
-    public class FXObjectInspector : AlchemyEditor
+    public class FXPlayerInspector : AlchemyEditor
     {
         
     }

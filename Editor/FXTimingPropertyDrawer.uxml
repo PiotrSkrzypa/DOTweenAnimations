@@ -1,0 +1,19 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/UnityFX/Editor/FXTimingPropertyDrawer.uss?fileID=7433441132597879392&amp;guid=6ae0abe6cc6f3394d89f60c91cfa62b2&amp;type=3#FXTimingPropertyDrawer" />
+    <ui:VisualElement style="flex-grow: 1;">
+        <ui:Foldout text="Timing">
+            <ui:Toggle label="Timescale Independent" name="TimescaleToggle" />
+            <ui:GroupBox>
+                <ui:FloatField label="Duration" value="0" name="Duration" auto-correction="false" />
+                <ui:FloatField label="Initial Delay" value="0" name="InitialDelay" />
+                <ui:FloatField label="Cooldown Duration" value="0" name="CooldownDuration" />
+                <ui:Toggle label="Contribute To Total Duration" name="ContributeToTotalDuration" value="false" />
+            </ui:GroupBox>
+            <ui:GroupBox>
+                <ui:Toggle label="RepeatForever" name="RepeatForever" />
+                <ui:IntegerField label="Number Of Repeats" value="1" name="NumberOfRepeats" />
+                <ui:FloatField label="Delay Between Repeats" value="0" name="DelayBetweenRepeats" />
+            </ui:GroupBox>
+        </ui:Foldout>
+    </ui:VisualElement>
+</ui:UXML>

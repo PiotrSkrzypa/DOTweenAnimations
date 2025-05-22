@@ -39,7 +39,7 @@ namespace PSkrzypa.UnityFX
                 SetState(FXPlaybackStateID.WaitingToStart);
                 await UniTask.Delay((int)( Timing.InitialDelay * 1000 ), cancellationToken: token);
 
-                int repeatCount = Timing.RepearForever ? int.MaxValue : Timing.NumberOfRepeats;
+                int repeatCount = Timing.RepeatForever ? int.MaxValue : Timing.NumberOfRepeats;
                 for (int i = 0; i < repeatCount; i++)
                 {
                     SetState(FXPlaybackStateID.Playing);

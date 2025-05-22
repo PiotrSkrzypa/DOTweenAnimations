@@ -1,4 +1,5 @@
 ﻿using System;
+using Alchemy.Inspector;
 using LitMotion;
 
 namespace PSkrzypa.UnityFX
@@ -14,10 +15,10 @@ namespace PSkrzypa.UnityFX
         public bool TimeScaleIndependent;
 
         public int NumberOfRepeats;
-        public bool RepearForever;
+        public bool RepeatForever;
         public float DelayBetweenRepeats;
 
-        public int PlayCount;
+        [ReadOnly]public int PlayCount;
 
         public IMotionScheduler GetScheduler() =>
     TimeScaleIndependent ? MotionScheduler.UpdateRealtime : MotionScheduler.Update;
