@@ -17,9 +17,9 @@ namespace PSkrzypa.UnityFX.Editor
             BindField<FloatField>(root, property, "InitialDelay");
             BindField<FloatField>(root, property, "CooldownDuration");
             BindField<FloatField>(root, property, "DelayBetweenRepeats");
-            BindField<IntegerField>(root, property, "NumberOfRepeats");
+            var numberOfRepeats = BindField<IntegerField>(root, property, "NumberOfRepeats");
             BindField<Toggle>(root, property, "ContributeToTotalDuration");
-            BindField<Toggle>(root, property, "RepeatForever");
+            var repeatForever = BindField<Toggle>(root, property, "RepeatForever");
             BindField<Toggle>(root, property, "TimeScaleIndependent");
            
             ClampFloat(root, "Duration");
@@ -27,6 +27,21 @@ namespace PSkrzypa.UnityFX.Editor
             ClampFloat(root, "CooldownDuration");
             ClampFloat(root, "DelayBetweenRepeats");
             ClampInt(root, "NumberOfRepeats");
+
+            var numberOfRepeatsField = numberOfRepeats;
+            var repeatForeverField = repeatForever;
+
+            if (repeatForeverField != null && numberOfRepeatsField != null)
+            {
+                // Initial state
+                numberOfRepeatsField.SetEnabled(!repeatForeverField.value);
+
+                // Respond to toggle change
+                repeatForeverField.RegisterValueChangedCallback(evt =>
+                {
+                    numberOfRepeatsField.SetEnabled(!evt.newValue);
+                });
+            }
             return root;
         }
         private T BindField<T>(VisualElement root, SerializedProperty parent, string fieldName)
